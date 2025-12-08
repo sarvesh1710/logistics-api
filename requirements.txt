@@ -1,0 +1,4 @@
+fastapi==0.109.2
+uvicorn[standard]==0.27.1
+pandas==2.2.1
+python-dateutil==2.8.2

@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: logistics-api
+    env: docker
+    repo: <sarvesh1710>/logistics-api
+    branch: main
+    autoDeploy: true
+    dockerfilePath: Dockerfile
+    plan: free
