@@ -22,7 +22,7 @@ app = FastAPI(title="Logistics Mock API (Local CSV backend)")
 
 EXPOSED_TABLES = os.getenv(
     "EXPOSED_TABLES",
-    "delivery_events,fuel_purchases,safety_incidents,maintenance_record"
+    "delivery_events,fuel_purchases,safety_incidents,maintenance_records"
 ).split(",")
 DATA_DIR = os.getenv("DATA_DIR", "data")
 
@@ -115,3 +115,4 @@ def query_table(
     log.info("Serving table=%s rows=%d offset=%d limit=%d", table_name, len(records), offset, limit)
 
     return JSONResponse(content=json_ready)
+
