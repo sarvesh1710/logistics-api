@@ -60,10 +60,11 @@ def table_schema(table_name: str, _auth: bool = Depends(verify_api_key)):
 @app.get("/api/{table_name}")
 def query_table(
     table_name: str,
-    start_date: Optional[str] = Query(None, description="ISO start date (YYYY-MM-DD or ISO datetime)"),
-    end_date: Optional[str] = Query(None, description="ISO end date"),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
     limit: int = Query(1000, ge=1, le=10000),
     offset: int = Query(0, ge=0),
+    full: bool = Query(False, description="Return full dataset"),
     _auth: bool = Depends(verify_api_key)
 ):
     table_name = table_name.strip()
@@ -86,10 +87,13 @@ def query_table(
             # if filtering fails, proceed with full df
             log.warning("Date filter failed for %s with start=%s end=%s", table_name, start_date, end_date)
 
-    # pagination
-    start = offset
-    end = offset + limit
-    df_page = df.iloc[start:end].copy()
+    if full:
+        df_page = df.copy()
+    else:
+        start = offset
+        end = offset + limit
+        df_page = df.iloc[start:end].copy()
+
 
     # Convert datetimes to ISO strings where present (defensive)
     for col in df_page.columns:
@@ -115,4 +119,5 @@ def query_table(
     log.info("Serving table=%s rows=%d offset=%d limit=%d", table_name, len(records), offset, limit)
 
     return JSONResponse(content=json_ready)
+
 
