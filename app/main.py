@@ -1,6 +1,3 @@
-```python
-# app/main.py
-
 import os
 import logging
 from typing import Optional
@@ -56,10 +53,7 @@ def verify_api_key(
 # --------------------------------------------------
 @app.get("/health")
 def health():
-    return {
-        "status": "ok",
-        "data_dir": DATA_DIR
-    }
+    return {"status": "ok", "data_dir": DATA_DIR}
 
 # --------------------------------------------------
 # List tables
@@ -67,10 +61,7 @@ def health():
 @app.get("/api/tables")
 def list_tables(_auth: bool = Depends(verify_api_key)):
     tables = loader.list_tables()
-    return {
-        "tables": tables,
-        "exposed": EXPOSED_TABLES
-    }
+    return {"tables": tables, "exposed": EXPOSED_TABLES}
 
 # --------------------------------------------------
 # Table schema
@@ -85,10 +76,7 @@ def table_schema(
         raise HTTPException(status_code=404, detail="Table not found")
 
     schema = loader.get_schema(table_name)
-    return {
-        "table": table_name,
-        "schema": schema
-    }
+    return {"table": table_name, "schema": schema}
 
 # --------------------------------------------------
 # Query table data
@@ -100,7 +88,7 @@ def query_table(
     end_date: Optional[str] = Query(None),
     limit: int = Query(1000, ge=1, le=10000),
     offset: int = Query(0, ge=0),
-    full: bool = Query(False, description="Return full dataset"),
+    full: bool = Query(False),
     _auth: bool = Depends(verify_api_key)
 ):
     table_name = table_name.strip()
@@ -116,61 +104,35 @@ def query_table(
     except FileNotFoundError:
         raise HTTPException(
             status_code=404,
-            detail=f"Table '{table_name}' not found in data directory '{DATA_DIR}'"
+            detail=f"Table '{table_name}' not found in '{DATA_DIR}'"
         )
     except Exception as e:
         log.exception("Error loading table %s", table_name)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error loading table: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=str(e))
 
-    # Optional date filtering
     if start_date or end_date:
         try:
             df = loader.filter_by_date(df, start_date, end_date)
         except Exception:
-            log.warning(
-                "Date filter failed for %s with start=%s end=%s",
-                table_name,
-                start_date,
-                end_date
-            )
+            log.warning("Date filter failed for %s", table_name)
 
-    # Pagination or full dataset
-    if full:
-        df_page = df.copy()
-    else:
-        start = offset
-        end = offset + limit
-        df_page = df.iloc[start:end].copy()
+    if not full:
+        df = df.iloc[offset : offset + limit]
 
-    # Convert datetime columns to ISO strings
-    for col in df_page.columns:
-        try:
-            if (
-                pd.api.types.is_datetime64_any_dtype(df_page[col])
-                or pd.api.types.is_datetime64tz_dtype(df_page[col])
-            ):
-                df_page[col] = df_page[col].dt.strftime("%Y-%m-%dT%H:%M:%S")
-            df_page[col] = df_page[col].where(df_page[col].notna(), None)
-        except Exception:
-            log.debug("Datetime conversion skipped for column %s", col)
+    for col in df.columns:
+        if pd.api.types.is_datetime64_any_dtype(df[col]):
+            df[col] = df[col].dt.strftime("%Y-%m-%dT%H:%M:%S")
 
-    # Replace pandas NA with None
-    df_page = df_page.where(pd.notnull(df_page), None)
+    df = df.where(pd.notnull(df), None)
 
-    # Convert to JSON-ready records
-    records = df_page.to_dict(orient="records")
+    records = df.to_dict(orient="records")
 
-    out = {
+    response = {
         "count": len(records),
         "offset": offset,
         "limit": limit,
         "data": records
     }
-
-    json_ready = jsonable_encoder(out)
 
     log.info(
         "Serving table=%s rows=%d offset=%d limit=%d",
@@ -180,5 +142,4 @@ def query_table(
         limit
     )
 
-    return JSONResponse(content=json_ready)
-```
+    return JSONResponse(content=jsonable_encoder(response))
